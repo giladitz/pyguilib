@@ -4,49 +4,43 @@ from random import randint
 
 class Win(Frame):
 
+    MOCK_MODEL = True
     GREETING_MESSAGE = "Hello, and welcome!\n"
 
     def __init__(self, master=None, blob_file=None):
         Frame.__init__(self, master)
         self.master = master
-        self.scroller, self.chat_box, self.response_box = None, None, None
-        self.submit_button = None
+        self.master.resizable(width=False, height=False)
+        self.scroller, self.chat_box, self.response_box, self.submit_button = None, None, None, None
         self.last_sentence = ""
         self.init_win()
         self.blob = ['It is true but not in the north.']
         if blob_file is not None:
-            with open(blob_file, 'r') as fh:
-                data = fh.read()
-                self.blob += data.split('\n')
+            try:
+                with open(blob_file, 'r') as fh:
+                    data = fh.read()
+                    self.blob += data.split('\n')
+            finally:
+                pass
 
     def init_win(self):
         self.master.title("~ chatbot ~")
         # allowing the widget to take the full space of the root window
         self.pack(fill=BOTH, expand=1)
         self.scroller = Scrollbar(self)
-        self.chat_box = Text(self, height=32, width=45, borderwidth="0")
+        self.chat_box = Text(self, height=32, width=47, borderwidth="0")
         self.response_box = Text(self, height=3, width=36, borderwidth="0")
         # creating a button instance
         self.submit_button = Button(self, text="Submit",
                                command=self.send_msg, bg="lightblue",
                                borderwidth="0", highlightcolor="black",
                                height="3", width="10")
-        """
-        activebackground, activeforeground, anchor,
-        background, bitmap, borderwidth, cursor,
-        disabledforeground, font, foreground
-        highlightbackground, highlightcolor,
-        highlightthickness, image, justify,
-        padx, pady, relief, repeatdelay,
-        repeatinterval, takefocus, text,
-        textvariable, underline, wraplength
-        """
+
         self.scroller.pack(side=RIGHT, fill=Y)
         self.scroller.config(command=self.chat_box.yview)
         self.chat_box.place(x=1, y=1)
         self.response_box.place(x=1, y=540)
-        self.submit_button.place(x=310, y=540)
-        self.chat_box.insert(END, ">> {}".format(self.GREETING_MESSAGE))
+        self.submit_button.place(x=300, y=540)
 
         # configs
         self.chat_box.tag_configure('bot',
@@ -57,6 +51,8 @@ class Win(Frame):
                                     font=('Tempus Sans ITC', 12, 'bold'))
 
         self.response_box.bind("<Key>", self.enter_key)
+        self.chat_box.insert(END, ">> {}".format(self.GREETING_MESSAGE), 'bot')
+        self.response_box.focus_set()
 
     def enter_key(self, event):
         if event.char == '\r':
@@ -64,11 +60,12 @@ class Win(Frame):
 
     def send_msg(self):
         # add msg to main bot window
-        self.last_sentence = self.response_box.get("1.0", END)
-        if self.last_sentence != "\n":
-            self.chat_box.insert(END, ">> {}".format(self.last_sentence), 'user')
-            self.response_box.delete("1.0", END)
-            self.call_responder(randone=True)
+        self.last_sentence = self.response_box.get("1.0", END).strip()
+        self.response_box.delete("1.0", END)
+        self.response_box.delete("1.0")
+        if self.last_sentence != "":
+            self.chat_box.insert(END, ">> {}\n".format(self.last_sentence), 'user')
+            self.call_responder(randone=self.MOCK_MODEL)
             self.chat_box.see(END)
 
     def update_response(self, response):
@@ -79,7 +76,7 @@ class Win(Frame):
             resp = self.blob[randint(0, len(self.blob)-1)]
         else:
             pass
-            #resp = apicall-to-model
+            #resp = api-call to model with "self.last_sentence" return string
         self.update_response(resp)
 
 
