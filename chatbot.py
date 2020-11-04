@@ -1,10 +1,11 @@
 from tkinter import *
+from model import Model
 from random import randint
 
 
 class Win(Frame):
 
-    MOCK_MODEL = True
+    MOCK_MODEL = False
     GREETING_MESSAGE = "Hello, and welcome!\n"
 
     def __init__(self, master=None, blob_file=None):
@@ -22,6 +23,12 @@ class Win(Frame):
                     self.blob += data.split('\n')
             finally:
                 pass
+
+        self.model = None
+        self.init_model()
+
+    def init_model(self):
+        self.model = Model()
 
     def init_win(self):
         self.master.title("~ chatbot ~")
@@ -51,7 +58,7 @@ class Win(Frame):
                                     font=('Tempus Sans ITC', 12, 'bold'))
 
         self.response_box.bind("<Key>", self.enter_key)
-        self.chat_box.insert(END, ">> {}".format(self.GREETING_MESSAGE), 'bot')
+        self.chat_box.insert(END, "Bot >> {}".format(self.GREETING_MESSAGE), 'bot')
         self.response_box.focus_set()
 
     def enter_key(self, event):
@@ -64,18 +71,19 @@ class Win(Frame):
         self.response_box.delete("1.0", END)
         self.response_box.delete("1.0")
         if self.last_sentence != "":
-            self.chat_box.insert(END, ">> {}\n".format(self.last_sentence), 'user')
+            self.chat_box.insert(END, "User>> {}\n".format(self.last_sentence), 'user')
             self.call_responder(randone=self.MOCK_MODEL)
             self.chat_box.see(END)
 
     def update_response(self, response):
-        self.chat_box.insert(END, ">> {}\n".format(response.strip()), 'bot')
+        self.chat_box.insert(END, "Bot >> {}\n".format(response.strip()), 'bot')
 
     def call_responder(self, randone=False):
         if randone:
             resp = self.blob[randint(0, len(self.blob)-1)]
         else:
-            pass
+            #resp = self.model.predict(self.last_sentence)
+            resp = self.model.print_result(self.last_sentence)
             #resp = api-call to model with "self.last_sentence" return string
         self.update_response(resp)
 

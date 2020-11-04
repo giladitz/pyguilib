@@ -1,164 +1,122 @@
-#Importing dependencies
-import pandas as pd
+import os
+import pickle
 import numpy as np
-import re
-from sklearn.feature_extraction.text import TfidfVectorizer
-import seaborn as sn
-import matplotlib.pyplot as plt
-from sklearn.model_selection import train_test_split, cross_val_score
-import string
-
-#Importing NLTK dependencies
-import nltk
-from nltk.tokenize import word_tokenize
-from nltk.stem.wordnet import WordNetLemmatizer
-from nltk.stem.porter import *
-from nltk import pos_tag
-
-#Importing vader
-from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
-
-#importing machine learning functions
-from sklearn.naive_bayes import MultinomialNB, GaussianNB
-from sklearn.svm import SVC
-from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
-from sklearn.metrics import plot_confusion_matrix
-from sklearn.model_selection import GridSearchCV
-import sklearn.manifold
-from sklearn.metrics import f1_score
-from sklearn import metrics
-from sklearn.preprocessing import LabelEncoder
-from sklearn.model_selection import train_test_split
-from sklearn.model_selection import train_test_split, cross_val_score
-from sklearn.metrics import roc_curve, roc_auc_score
-import scikitplot as skpl
+import tensorflow as tf
+from tensorflow import keras
+from keras.preprocessing.text import Tokenizer
+from keras.preprocessing.sequence import pad_sequences
 
 
+class JustRespond:
 
-# Preprocessing functions
-def clean(text):
-    text = re.sub(
-        r'(?i)\b((?:https?://|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:\'".,<>?«»“”‘’]))',
-        '', text, flags=re.MULTILINE)
-    text = text.lower()
-    text = re.sub(r'\d+', '', text)
-    text = re.sub(r'@[A-Za-z0-9]+', '', text)
-    text = re.sub(r'#', '', text)
-    text = text.translate(str.maketrans('', '', string.punctuation))
-    text = re.sub(r"[^\w\s\d]", "", text)
-    text = re.sub(r"\s+", " ", text).strip()
-    return (text)
+    def __init__(self):
+        self.index = 0
+        self.responses = ["I don't know what to say...",
+                          "Oops I have issues here, one moment",
+                          "Let's start all over again",
+                          "Mmmmm..."]
 
+    def respond(self):
+        ret = self.responses[self.index]
+        if self.index < len(self.responses):
+            self.index += 1
+        else:
+            self.index = 0
+        return ret
 
-# Emoticon removal
-def demoji(text):
-    regrex_pattern = re.compile(pattern="["
-                                        u"\U0001F600-\U0001F64F"  # emoticons
-                                        u"\U0001F300-\U0001F5FF"  # symbols & pictographs
-                                        u"\U0001F680-\U0001F6FF"  # transport & map symbols
-                                        u"\U0001F1E0-\U0001F1FF"  # flags (iOS)
-                                        "]+", flags=re.UNICODE)
-    return regrex_pattern.sub(r'', text)
+class Model:
+    
+    MAX_LEN = 20
 
+    def __init__(self, model_name='full_chatbot_model_40k_10epc.h5'):
+        
+        self.model = tf.keras.models.load_model(model_name)
+        #print("Model loaded: \n")
+        #self.model.summary()
 
-from nltk.corpus import stopwords
+        with open('tokenizer_object.pickle', 'rb') as handle:
+            self.tokenizer = pickle.load(handle)
 
-stopwords = set(stopwords.words('english'))
+        with open('index2word_dict.pickle', 'rb') as handle:
+            self.index2word = pickle.load(handle)
 
+        self.encoder_sequence_1_data, self.decoder_sequence_1_data = None, None
+        self.voc = ["", "bos", "eos"]
+        self.voc += pickle.load(open('voc_dictionary.pickle', 'rb')) #[:10000]
+        for index, item in enumerate(self.voc):
+            if "bos" == item:
+                print(index)
+            if "eos" == item:
+                print(index)
 
-# Stopwords removal
-def stop(text):
-    return (" ".join([word for word in str(text).split() if word not in stopwords]))
-
-
-# Tokenization of the sentences
-def token(text):
-    return word_tokenize(df['Tweets'])
-
-
-# Lemmetising
-le = WordNetLemmatizer()
-stemmer = PorterStemmer()
+        self.jr = JustRespond()
 
 
-# defining parts of speech of morphy tags
-def POS(text):
-    tags = {'NN': 'n', 'JJ': 'a',
-            'VB': 'v', 'RB': 'r'}
-    try:
-        return tags[text[:2]]
-    except:
-        return 'n'
+    def enc_dec_sentence(self, sentence: str):
+        encoder_sequence_1 = self.tokenizer.texts_to_sequences([sentence])
+        decoder_sequence_1 = self.tokenizer.texts_to_sequences([""])
 
-    # Lemmatizing
+        self.encoder_sequence_1_data = pad_sequences(encoder_sequence_1, maxlen=self.MAX_LEN, dtype='int32', padding='post', truncating='post')
+        #self.decoder_sequence_1_data = pad_sequences(decoder_sequence_1, maxlen=self.MAX_LEN, dtype='int32', padding='post', truncating='post')
+        self.decoder_sequence_1_data = np.zeros((1, self.MAX_LEN))
+        self.decoder_sequence_1_data[0, 0] = 2
+        #self.decoder_sequence_1_data[0, -2] = 3
+        #self.decoder_sequence_1_data[0, -1] = 1
+        print("encoder_sequence_1_data: {} \n\n".format(self.encoder_sequence_1_data))
+        print("decoder_sequence_1_data: {} \n\n".format(self.decoder_sequence_1_data))
+        print("length check encoder[{}], decoder[{}], verdict: {}".format(len(self.encoder_sequence_1_data[0]), len(self.decoder_sequence_1_data[0]), (len(self.encoder_sequence_1_data[0]) == len(self.decoder_sequence_1_data[0]))))
 
+    def predict(self, sentence: str):
+        
+        self.enc_dec_sentence(sentence)
+        try:
+            p = self.model.predict([self.encoder_sequence_1_data,
+                                    self.decoder_sequence_1_data])
+        except:
+            return self.jr.respond()
 
-def lemmatize(text):
-    # Text input is string, returns lowercased strings.
-    return [le.lemmatize(word.lower(), pos=POS(tag))
-            for word, tag in pos_tag(word_tokenize(text))]
+        print("[predict] p={}".format(p))
+        #print("[predict] argmax(p)={}".format(np.argmax(p)))
+        out_index_sentence = []
+        for item in p:
+            for l1 in item:
+                out_index_sentence.append(np.argmax(l1))
+        
+        print("[predict] out_index_sentence={}".format(out_index_sentence))
 
+        out_str_sentence = ""
+        for index in out_index_sentence:
+            if index != 0:
+                out_str_sentence += " " + self.index2word[index]
 
-# stemming
-def stem(text):
-    return " ".join([stemmer.stem(word) for word in text])
+        print("[predict] out_str_sentence={}".format(out_str_sentence))
 
+        return out_str_sentence
 
-# Applying functions
-df['Tweets'] = df['Tweets'].apply(lambda text: clean(text))
-df['Tweets'] = df['Tweets'].apply(lambda text: demoji(text))
-df['Tweets'] = df['Tweets'].apply(lambda text: stop(text))
-df['Tweets'] = df['Tweets'].apply(lambda text: lemmatize(text))
-df['Tweets'] = df['Tweets'].apply(lambda text: stem(text))
+    def print_result(self, input):
+        maxlen_input = 20
+        encoder_input = self.tokenizer.texts_to_sequences(["<bos>" + input + "<eos>"])
+        dictionary_size = len(self.voc)
+        encoder_input_pad = pad_sequences(encoder_input, maxlen=self.MAX_LEN, dtype='int32', padding='post',
+                                                     truncating='post')
+        ans_partial = np.zeros((1, maxlen_input))
+        ans_partial[0, -1] = 2  # the index of the symbol BOS (begin of sentence)
+        for k in range(maxlen_input - 1):
+            try:
+                ye = self.model.predict([encoder_input_pad, ans_partial])
+                mp = np.argmax(ye)
+            except:
+                mp = 0
+            ans_partial[0, 0:-1] = ans_partial[0, 1:]
+            ans_partial[0, -1] = mp
+        text = ''
+        for k in ans_partial[0]:
+            k = k.astype(int)
+            if k < (dictionary_size - 2):
+                w = self.voc[k]
+                text = text + w + ' '
+        return text
 
-
-#A function to create various N-gram combinations
-def tfidf(i,j):
-    tfidf = TfidfVectorizer(sublinear_tf=True, min_df=5,stop_words='english',ngram_range=(i,j))
-    return(tfidf.fit_transform(df['Tweets']).toarray())
-
-#calling the function of tfidf for various combinations of N-gram.
-features=tfidf(1,1)
-
-#labelling the sentiments
-la=LabelEncoder()
-df['Label'] = la.fit_transform(df['Sentiment'])
-
-#printing the dataset
-df.head()
-
-#features and labels
-x=features
-y=df['Label']
-
-#Train test split
-x_train, x_test, y_train, y_test = train_test_split(features, y, test_size=0.3, random_state=42)
-
-#Classification using Multinomial Naive Bayes
-classifier = MultinomialNB(fit_prior=True,alpha=0.1)
-classifier.fit(x_train, y_train)
-y_pred = classifier.predict(x_test)
-
-#Printing the metrics
-print("Classification Report: \n", classification_report(y_test,y_pred))
-print("Accuracy: ", (accuracy_score(y_test, y_pred))*100)
-print("F1 score: ",f1_score(y_test, y_pred, average='macro'))
-
-#Support Vector machine classifier
-clf=SVC(C=1,gamma=1,kernel='linear',probability=True)
-clf.fit(x_train, y_train)
-y_pred = clf.predict(x_test)
-
-#printing metrics
-print("Classification Report: \n", classification_report(y_test,y_pred))
-print("Accuracy: ", (accuracy_score(y_test, y_pred))*100)
-print("F1 score: ",f1_score(y_test, y_pred, average='macro'))
-
-#function to plot ROC for classifiers
-def ROC(model):
-    ypred=model.predict_proba(x_test)
-    return(skpl.metrics.plot_roc(y_test,ypred))
-
-#Plotting the classifer's ROC
-ROC(classifier)
-ROC(clf)
+#if __name__ == "__main__":
+    #model = Model()
+    #print(model.predict("who are you"))
