@@ -1,5 +1,6 @@
 import os
 import pickle
+import random
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
@@ -28,7 +29,7 @@ class Model:
     
     MAX_LEN = 20
 
-    def __init__(self, model_name='full_chatbot_model_40k_10epc.h5'):
+    def __init__(self, model_name='simple_sntc_model_50epc.h5'):
         
         self.model = tf.keras.models.load_model(model_name)
         #print("Model loaded: \n")
@@ -95,10 +96,10 @@ class Model:
 
     def print_result(self, input):
         maxlen_input = 20
-        encoder_input = self.tokenizer.texts_to_sequences(["<bos>" + input + "<eos>"])
+        encoder_input = self.tokenizer.texts_to_sequences([input])
         dictionary_size = len(self.voc)
         encoder_input_pad = pad_sequences(encoder_input, maxlen=self.MAX_LEN, dtype='int32', padding='post',
-                                                     truncating='post')
+                                          truncating='post')
         ans_partial = np.zeros((1, maxlen_input))
         ans_partial[0, -1] = 2  # the index of the symbol BOS (begin of sentence)
         for k in range(maxlen_input - 1):
@@ -116,6 +117,30 @@ class Model:
                 w = self.voc[k]
                 text = text + w + ' '
         return text
+
+    def models_predict(self, user_sentence):
+        bot_response = []
+        extract_words = len(user_sentence.split()) + 3
+        extract_words = random.randint(2, extract_words)
+        toks = self.tokenizer.texts_to_sequences([user_sentence])[0]
+        toks = pad_sequences([toks], maxlen=39, padding='pre', truncating='post')
+        for _ in range(10):
+
+            predicted = self.model.predict(toks, verbose=0)
+            max = np.argmax(predicted)
+            out_word = ""
+            for word, index in self.tokenizer.word_index.items():
+                if index == max:
+                    out_word = word
+                    break
+            bot_response.append(out_word)
+            toks[0][:-1] = toks[0][1:]
+            toks[0][-1] = 0
+            #bot_response += " " + out_word
+
+        bot_response = set(bot_response)
+
+        return " ".join(bot_response)
 
 #if __name__ == "__main__":
     #model = Model()

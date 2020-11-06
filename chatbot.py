@@ -38,7 +38,7 @@ class Win(Frame):
         self.chat_box = Text(self, height=32, width=47, borderwidth="0")
         self.response_box = Text(self, height=3, width=36, borderwidth="0")
         # creating a button instance
-        self.submit_button = Button(self, text="Submit",
+        self.submit_button = Button(self, text="SEND",
                                command=self.send_msg, bg="lightblue",
                                borderwidth="0", highlightcolor="black",
                                height="3", width="10")
@@ -82,8 +82,9 @@ class Win(Frame):
         if randone:
             resp = self.blob[randint(0, len(self.blob)-1)]
         else:
+            resp = self.model.models_predict(self.last_sentence)
             #resp = self.model.predict(self.last_sentence)
-            resp = self.model.print_result(self.last_sentence)
+            #resp = self.model.print_result(self.last_sentence)
             #resp = api-call to model with "self.last_sentence" return string
         self.update_response(resp)
 
